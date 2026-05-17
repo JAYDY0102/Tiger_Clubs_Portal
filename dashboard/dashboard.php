@@ -37,14 +37,18 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Admin — Club & Role Management</title>
+    <title>Dashboard — Club & Role Management</title>
     <link rel="stylesheet" href="../styles.css" />
+    <script>
+        // Expose current admin email to the client script (for self-demotion guard)
+        const currentAdminEmail = <?= json_encode($userEmail) ?>;
+    </script>
 </head>
 <body>
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
-        <span>Club Portal — Admin</span>
+        <span>Tiger Clubs Portal — Dashboard</span>
     </div>
     <nav class="nav">
         <a href="../index.php">Home</a>
@@ -214,78 +218,112 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
         </div>
     </div>
 
-    <div class="admin-panel" style="margin-top:24px;">
-        <h2>Bulk Assign Roles</h2>
-        <form id="bulkForm">
-            <div class="bulk-form-row">
-                <div class="form-group">
-                    <label for="bulkEmails">Emails</label>
-                    <input id="bulkEmails" type="text" placeholder="alice@siskorea.org, bob@stu.siskorea.org" />
-                </div>
-
-                <div class="form-group">
-                    <label for="bulkRole">Role</label>
-                    <select id="bulkRole">
-                        <option value="student">student</option>
-                        <option value="teacher">teacher</option>
-                        <option value="executive" selected>executive</option>
-                        <option value="admin">admin</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="bulkClub">Club</label>
-                    <select id="bulkClub">
-                        <option value="">—</option>
-                        <?php foreach ($clubDirs as $d):
-                            $dir = (string) $d;
-                            if ($isExecutive && !$isAdmin && !in_array($dir, $execClubDirs, true)) {
-                                continue;
-                            }
-                            ?>
-                            <option value="<?= htmlspecialchars($dir) ?>"><?= htmlspecialchars(ucwords(str_replace(['-', '_'], ' ', $dir))) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="bulkAction">Action</label>
-                    <select id="bulkAction">
-                        <option value="">None</option>
-                        <option value="add">Add</option>
-                        <option value="remove">Remove</option>
-                    </select>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" id="bulkClear" class="btn btn-ghost">Clear</button>
-                    <button type="submit" class="btn btn-primary">Assign</button>
-                </div>
-            </div>
-        </form>
-
-        <div id="bulkResult" class="bulk-result"></div>
-    </div>
-
-    <div class="admin-panel" style="margin-top:24px;">
-        <h2>All Users</h2>
-        <div style="display:grid; gap:8px;">
-            <?php if ($allUsers): foreach ($allUsers as $u): ?>
-                <div style="display:flex; justify-content:space-between; padding:10px; background:#fafafa; border-radius:8px; border:1px solid var(--line); font-size:13px;">
-                    <div>
-                        <strong><?= htmlspecialchars((string) $u['name']) ?></strong><br />
-                        <span class="small"><?= htmlspecialchars((string) $u['email']) ?></span>
+    <?php if ($isAdmin): ?>
+        <div class="admin-panel" style="margin-top:24px;">
+            <h2>Bulk Assign Roles</h2>
+            <form id="bulkForm">
+                <div class="bulk-form-row">
+                    <div class="form-group">
+                        <label for="bulkEmails">Emails</label>
+                        <input id="bulkEmails" type="text" placeholder="alice@siskorea.org, bob@stu.siskorea.org" />
                     </div>
-                    <div style="text-align:right;">
-                        <span class="badge"><?= htmlspecialchars((string) $u['role']) ?></span><br />
-                        <span class="small"><?= htmlspecialchars(substr((string) $u['created_at'], 0, 10)) ?></span>
+
+                    <div class="form-group">
+                        <label for="bulkRole">Role</label>
+                        <select id="bulkRole">
+                            <option value="student">student</option>
+                            <option value="teacher">teacher</option>
+                            <option value="executive" selected>executive</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulkClub">Club</label>
+                        <select id="bulkClub">
+                            <option value="">—</option>
+                            <?php foreach ($clubDirs as $d):
+                                $dir = (string) $d;
+                                if ($isExecutive && !$isAdmin && !in_array($dir, $execClubDirs, true)) {
+                                    continue;
+                                }
+                                ?>
+                                <option value="<?= htmlspecialchars($dir) ?>"><?= htmlspecialchars(ucwords(str_replace(['-', '_'], ' ', $dir))) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulkAction">Action</label>
+                        <select id="bulkAction">
+                            <option value="">None</option>
+                            <option value="add">Add</option>
+                            <option value="remove">Remove</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="bulkClear" class="btn btn-ghost">Clear</button>
+                        <button type="submit" class="btn btn-primary">Assign</button>
                     </div>
                 </div>
-            <?php endforeach; else: ?>
-                <p class="small">No users registered yet.</p>
-            <?php endif; ?>
+            </form>
+
+            <div id="bulkResult" class="bulk-result"></div>
         </div>
-    </div>
+
+        <div class="admin-panel" style="margin-top:24px;">
+            <h2>All Users</h2>
+            <div style="display:grid; gap:8px;">
+                <?php
+                // Precompute executive membership map: email (lowercase) => [clubDir, ...]
+                $execMap = [];
+                foreach ($clubDirs as $d) {
+                    $dir = (string) $d;
+                    $drawer = club_load_drawer($dir);
+                    if ($drawer === false) continue;
+                    $execs = array_map('strtolower', $drawer['executiveEmails'] ?? []);
+                    foreach ($execs as $e) {
+                        $execMap[$e][] = $dir;
+                    }
+                }
+                ?>
+
+                <?php if ($allUsers): foreach ($allUsers as $u): ?>
+                    <?php
+                    $userEmailRow = strtolower((string)($u['email'] ?? ''));
+                    $role = (string)($u['role'] ?? '');
+                    $roleLabel = htmlspecialchars($role);
+
+                    // If user has DB role 'executive', show the clubs they are assigned to (if any)
+                    if ($role === 'executive') {
+                        $clubsForUser = $execMap[$userEmailRow] ?? [];
+                        if (!empty($clubsForUser)) {
+                            // Convert slugs to human-friendly names ("coding-club" -> "Coding Club")
+                            $labels = array_map(function ($slug) {
+                                return ucwords(str_replace(['-', '_'], ' ', $slug));
+                            }, $clubsForUser);
+                            $roleLabel .= ': ' . htmlspecialchars(implode(', ', $labels));
+                        }
+                    }
+                    ?>
+                    <div style="display:flex; justify-content:space-between; padding:10px; background:#fafafa; border-radius:8px; border:1px solid var(--line); font-size:13px;">
+                        <div>
+                            <strong><?= htmlspecialchars((string) $u['name']) ?></strong><br />
+                            <span class="small"><?= htmlspecialchars((string) $u['email']) ?></span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span class="badge"><?= $roleLabel ?></span><br />
+                            <span class="small"><?= htmlspecialchars(substr((string) $u['created_at'], 0, 10)) ?></span>
+                        </div>
+                    </div>
+                <?php endforeach; else: ?>
+                    <p class="small">No users registered yet.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
 </main>
 
 <script>
@@ -419,7 +457,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
         }
 
         try {
-            const { res, json } = await fetchJson(`/admin/get-club.php?club=${encodeURIComponent(club)}`);
+            const { res, json } = await fetchJson(`/dashboard/get-club.php?club=${encodeURIComponent(club)}`);
             if (!res.ok || json.error) {
                 alert('Error: ' + (json.error || 'Unknown'));
                 return;
@@ -521,30 +559,30 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
         }
     });
 
-    el.bulkClear.addEventListener('click', () => {
-        el.bulkEmails.value = '';
-        el.bulkRole.value = 'executive';
-        el.bulkClub.value = '';
-        el.bulkAction.value = '';
-        el.bulkResult.classList.remove('show');
-        el.bulkResult.textContent = '';
-    });
-
+    // Bulk UI and submit handler (admin-only panel is rendered server-side)
     function buildBulkResultHtml(json) {
         let html = '<strong>Assignment Results:</strong><ul>';
 
         if (json.results) {
             for (const r of json.results) {
-                const status = r.error
-                    ? 'Error: ' + r.error
-                    : (r.created ? 'Created & ' : '') + (r.role_updated ? 'role updated' : 'no change');
+                let status = '';
+                if (r.error) {
+                    status = 'Error: ' + r.error;
+                } else {
+                    const parts = [];
+                    if (r.created) parts.push('created');
+                    if (r.role_updated) parts.push('role updated');
+                    if (r.demoted) parts.push('demoted');
+                    status = parts.length ? parts.join(' & ') : 'no change';
+                }
                 html += `<li><strong>${r.email}</strong> — ${status}</li>`;
             }
         }
         html += '</ul>';
 
         if (json.club) {
-            html += `<div style="margin-top:8px;"><strong>Club: ${json.club.dirName}</strong><br />`;
+            const dir = json.club.dirName || json.club.clubDir || 'Unknown';
+            html += `<div style="margin-top:8px;"><strong>Club: ${dir}</strong><br />`;
             if (json.club.executiveEmails && json.club.executiveEmails.length) {
                 html += `<small>Executives: ${json.club.executiveEmails.join(', ')}</small>`;
             } else {
@@ -556,38 +594,114 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
         return html;
     }
 
-    el.bulkForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const emails = el.bulkEmails.value.trim();
-        if (!emails) {
-            alert('Enter at least one email');
-            return;
+    // --- Start: Bulk role UI toggle & validation ---
+    // Show/disable club selection only when role === 'executive'; show Action for all roles.
+    function updateBulkUiForRole() {
+        const role = el.bulkRole?.value;
+        const needsClub = (role === 'executive');
+        const needsAction = (typeof role !== 'undefined' && role !== null && role !== '');
+
+        // Show/hide club selector only for executives
+        if (el.bulkClub) {
+            const clubGroup = el.bulkClub.closest('.form-group');
+            if (clubGroup) clubGroup.style.display = needsClub ? '' : 'none';
+            el.bulkClub.disabled = !needsClub;
         }
 
-        const fd = new FormData();
-        fd.append('emails', emails);
-        fd.append('role', el.bulkRole.value);
-        if (el.bulkClub.value) {
-            fd.append('clubDir', el.bulkClub.value);
-            if (el.bulkAction.value) fd.append('clubAction', el.bulkAction.value);
+        if (el.bulkAction) {
+            const actionGroup = el.bulkAction.closest('.form-group');
+            if (actionGroup) actionGroup.style.display = needsAction ? '' : 'none';
+            el.bulkAction.disabled = !needsAction;
         }
+    }
 
-        try {
-            const { json } = await fetchJson('/admin/assign-role.php', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd
-            });
+    // initialize UI state on load
+    updateBulkUiForRole();
 
-            el.bulkResult.classList.add('show');
-            el.bulkResult.innerHTML = buildBulkResultHtml(json);
-            el.bulkEmails.value = '';
-        } catch (err) {
-            console.error(err);
-            el.bulkResult.classList.add('show');
-            el.bulkResult.innerHTML = '<strong>Error</strong>';
-        }
-    });
+    // Update when role selection changes
+    if (el.bulkRole) {
+        el.bulkRole.addEventListener('change', () => {
+            updateBulkUiForRole();
+        });
+    }
+
+    if (el.bulkClear) {
+        el.bulkClear.addEventListener('click', () => {
+            if (el.bulkEmails) el.bulkEmails.value = '';
+            if (el.bulkRole) el.bulkRole.value = 'executive';
+            if (el.bulkClub) el.bulkClub.value = '';
+            if (el.bulkAction) el.bulkAction.value = '';
+            if (el.bulkResult) {
+                el.bulkResult.classList.remove('show');
+                el.bulkResult.textContent = '';
+            }
+            updateBulkUiForRole();
+        });
+    }
+
+    // Single submit handler: always submit clubAction; clubDir only for executive role
+    if (el.bulkForm) {
+        el.bulkForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emails = (el.bulkEmails && el.bulkEmails.value) ? el.bulkEmails.value.trim() : '';
+            const role = el.bulkRole ? el.bulkRole.value : '';
+            const club = el.bulkClub ? el.bulkClub.value : '';
+            const action = el.bulkAction ? el.bulkAction.value : '';
+
+            if (!emails) {
+                alert('Enter at least one email');
+                return;
+            }
+
+            // If role is executive and an action was chosen, require a club
+            if (role === 'executive' && action && !club) {
+                alert('Select a club to add/remove executives.');
+                return;
+            }
+
+            // Optional safety: prevent current admin from revoking their own admin role.
+            if (action === 'remove' && role === 'admin') {
+                if (typeof currentAdminEmail !== 'undefined' && emails.toLowerCase().includes(currentAdminEmail.toLowerCase())) {
+                    if (!confirm('You are about to remove admin privileges for yourself. This will revoke your admin access. Continue?')) {
+                        return;
+                    }
+                }
+            }
+
+            const fd = new FormData();
+            fd.append('emails', emails);
+            fd.append('role', role);
+
+            // Always include the action when provided (backend will interpret appropriately for non-exec roles)
+            if (action) fd.append('clubAction', action);
+
+            // Only include clubDir for executive role
+            if (role === 'executive' && club) {
+                fd.append('clubDir', club);
+            }
+
+            try {
+                const { json } = await fetchJson('/dashboard/assign-role.php', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: fd
+                });
+
+                if (el.bulkResult) {
+                    el.bulkResult.classList.add('show');
+                    el.bulkResult.innerHTML = buildBulkResultHtml(json);
+                }
+                if (el.bulkEmails) el.bulkEmails.value = '';
+            } catch (err) {
+                console.error(err);
+                if (el.bulkResult) {
+                    el.bulkResult.classList.add('show');
+                    el.bulkResult.innerHTML = '<strong>Error</strong>';
+                }
+            }
+        });
+    }
+    // --- End: Bulk role UI toggle & validation ---
 </script>
 </body>
 </html>

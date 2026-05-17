@@ -65,7 +65,18 @@ $projectRoot = dirname(__DIR__);
 $clubEdited = null;
 $updatedExecs = null;
 
-if ($clubDir !== '') {
+// Optional club validation: only relevant when assigning/removing executives
+$projectRoot = dirname(__DIR__);
+$clubEdited = null;
+$updatedExecs = null;
+
+// If assigning the 'executive' role, require a club to be specified.
+// This prevents creating a global executive role with no club association.
+if ($role === 'executive') {
+    if ($clubDir === '') {
+        jsonExit(['error' => 'clubDir is required when assigning the executive role'], 400);
+    }
+
     if (!preg_match('/^[a-z0-9\-_]+$/', $clubDir)) {
         jsonExit(['error' => 'Invalid club directory name'], 400);
     }
@@ -78,6 +89,21 @@ if ($clubDir !== '') {
         jsonExit(['error' => 'Invalid club action'], 400);
     }
     $clubEdited = $clubDir;
+} else {
+    // For non-executive roles: ignore clubDir (club doesn't apply),
+    // but keep clubAction so the backend can honor "remove" to revoke roles.
+    $clubDir = '';
+    // $clubAction remains as provided (could be '', 'add', or 'remove')
+}
+
+// Decide what DB role to write based on requested role and clubAction
+// For 'executive' we only set DB role when adding executives (clubAction === 'add').
+// For other roles, 'remove' means revoke -> set to 'student'; otherwise set to the requested role.
+$dbRoleForUpdate = null;
+if ($role === 'executive') {
+    $dbRoleForUpdate = ($clubAction === 'add') ? 'executive' : null;
+} else {
+    $dbRoleForUpdate = ($clubAction === 'remove') ? 'student' : $role;
 }
 
 // Results per email
@@ -93,19 +119,23 @@ foreach ($emails as $email) {
         $user = $stmt->fetch();
 
         if ($user) {
-            // Update role if different
-            if ($user['role'] !== $role) {
+            // Only update DB role if we computed a role to set for this operation
+            if ($dbRoleForUpdate !== null && $user['role'] !== $dbRoleForUpdate) {
                 $u = $pdo->prepare("UPDATE users SET role = ? WHERE email = ?");
-                $u->execute([$role, $email]);
+                $u->execute([$dbRoleForUpdate, $email]);
                 $row['role_updated'] = true;
             }
         } else {
-            // Create a minimal user entry (name from local part)
+            // Create a minimal user entry. If $dbRoleForUpdate is null, default to 'student'
             $name = explode('@', $email)[0];
+            $createRole = $dbRoleForUpdate ?? 'student';
             $ins = $pdo->prepare("INSERT INTO users (name, email, google_id, role) VALUES (?, ?, ?, ?)");
-            $ins->execute([$name, $email, '', $role]);
+            $ins->execute([$name, $email, '', $createRole]);
             $row['created'] = true;
-            $row['role_updated'] = true;
+            // consider this a role change if created with a non-student role
+            if ($createRole !== 'student') {
+                $row['role_updated'] = true;
+            }
         }
     } catch (Exception $e) {
         $row['error'] = 'DB error: ' . $e->getMessage();
@@ -138,6 +168,55 @@ if ($clubEdited !== null && $clubAction !== '') {
 
     $updatedExecs = $drawer['executiveEmails'];
 }
+
+// --- Start: Demote users who are no longer executives in any club ---
+// Build a map of executive membership: email (lowercase) => true
+try {
+    $clubsFile = $projectRoot . '/clubs.json';
+    $allClubDirs = json_decode((string) file_get_contents($clubsFile), true);
+    if (!is_array($allClubDirs)) $allClubDirs = [];
+
+    $execMap = [];
+    foreach ($allClubDirs as $cdir) {
+        $drawerPath = $projectRoot . '/' . $cdir . '/drawer.json';
+        if (!file_exists($drawerPath)) continue;
+        $d = json_decode((string) file_get_contents($drawerPath), true);
+        if (!is_array($d)) continue;
+        $execs = array_map('strtolower', $d['executiveEmails'] ?? []);
+        foreach ($execs as $e) {
+            $execMap[$e] = true;
+        }
+    }
+
+    foreach ($emails as $email) {
+        $emailLower = strtolower($email);
+        $stillExec = isset($execMap[$emailLower]);
+
+        // If not executive anywhere, demote in DB (only if currently role = 'executive')
+        if (!$stillExec) {
+            $demoteStmt = $pdo->prepare("UPDATE users SET role = 'student' WHERE email = ? AND role = 'executive'");
+            $demoteStmt->execute([$email]);
+
+            if ($demoteStmt->rowCount() > 0) {
+                // Mark the result for this email: role_updated / demoted
+                foreach ($results as &$r) {
+                    if (isset($r['email']) && strtolower($r['email']) === $emailLower) {
+                        $r['role_updated'] = true;
+                        $r['demoted'] = true;
+                        break;
+                    }
+                }
+                unset($r);
+            }
+        }
+    }
+} catch (Exception $e) {
+    // Non-fatal: attach an error to first result so admin sees something went wrong
+    if (!empty($results)) {
+        $results[0]['error'] = ($results[0]['error'] ? $results[0]['error'] . '; ' : '') . 'Demotion error: ' . $e->getMessage();
+    }
+}
+// --- End: Demote users who are no longer executives in any club ---
 
 // Determine if request is AJAX (fetch from front-end)
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) || (strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false);

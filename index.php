@@ -30,9 +30,9 @@ $user = $_SESSION['user'] ?? null;
         <a href="#">Feed</a>
         <a href="#">Calendar</a>
         <?php if ($isLoggedIn && $user['role'] === 'admin'): ?>
-            <a href="admin/dashboard.php">Admin Dashboard</a>
+            <a href="dashboard/dashboard.php">Admin Dashboard</a>
         <?php elseif ($isLoggedIn && $user['role'] === 'executive'): ?>
-            <a href="#">Executive Dashboard</a>
+            <a href="dashboard/executive.php">Executive Dashboard</a>
         <?php else: ?>
             <a href="#">Dashboard</a>
         <?php endif; ?>
@@ -133,3 +133,4 @@ $user = $_SESSION['user'] ?? null;
 <script src="script.js"></script>
 </body>
 </html>
+
