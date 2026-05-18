@@ -28,8 +28,9 @@ function api_require_managed_club(): array
     $user = $_SESSION['user'];
     $isAdmin = ($user['role'] ?? '') === 'admin';
     $isExecutive = ($user['role'] ?? '') === 'executive';
+    $isAdvisor = ($user['role'] ?? '') === 'advisor';
 
-    if (!$isAdmin && !$isExecutive) {
+    if (!$isAdmin && !$isExecutive && !$isAdvisor) {
         api_json_error('Permission denied', 403);
     }
 

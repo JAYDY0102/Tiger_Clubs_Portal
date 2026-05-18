@@ -94,7 +94,7 @@ CREATE TABLE users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
   google_id VARCHAR(255) DEFAULT '',
-  role ENUM('student','teacher','executive','admin') NOT NULL DEFAULT 'student',
+  role ENUM('student','advisor','executive','admin') NOT NULL DEFAULT 'student',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -116,7 +116,7 @@ Adjust types to match your conventions. The app does not currently require a pas
 
 ## How the roles & permissions work
 
-- Roles: `student`, `teacher`, `executive`, `admin`.
+- Roles: `student`, `advisor`, `executive`, `admin`.
 - `admin` can manage all clubs and access the admin dashboard (`admin/dashboard.php`).
 - `executive` can manage clubs they are assigned to — per-club `drawer.json` contains `executiveEmails` (lowercase).
 - Executives editing/updating club data use `api/update-club.php` and `api/upload-banner.php`; both call `api_require_managed_club()` which checks session and club membership using `auth/club-utils.php`.

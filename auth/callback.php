@@ -89,7 +89,7 @@ if ($user) {
         INSERT INTO users (name, email, google_id, role)
         VALUES (?, ?, ?, ?)
     ");
-    $insert->execute([$name, $email, $googleId, $state === 'staff' ? 'teacher' : 'student']);
+    $insert->execute([$name, $email, $googleId, $state === 'staff' ? 'advisor' : 'student']);
 }
 
 $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");

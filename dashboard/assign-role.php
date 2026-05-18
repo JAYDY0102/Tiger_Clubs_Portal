@@ -12,15 +12,17 @@ function jsonExit($data, int $status = 200) {
     exit;
 }
 
-// must be admin
-if (!isset($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'admin') {
-    // If AJAX, return JSON; else show forbidden
+if (!isset($_SESSION['user'])) {
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-        jsonExit(['error' => 'Forbidden'], 403);
+        jsonExit(['error' => 'Not authenticated'], 401);
     }
-    http_response_code(403);
-    exit('Forbidden');
+    http_response_code(401);
+    exit('Not authenticated');
 }
+
+$currentUser = $_SESSION['user'];
+$currentUserRole = (string)($currentUser['role'] ?? '');
+$currentUserEmail = (string)($currentUser['email'] ?? '');
 
 // load DB
 $pdo = require __DIR__ . '/../auth/db.php';
@@ -32,7 +34,7 @@ $clubDir = isset($_POST['clubDir']) ? trim((string)$_POST['clubDir']) : '';
 $clubAction = isset($_POST['clubAction']) ? trim((string)$_POST['clubAction']) : '';
 
 // Validate role
-$allowedRoles = ['student','teacher','executive','admin'];
+$allowedRoles = ['student','advisor','executive','admin'];
 if (!in_array($role, $allowedRoles, true)) {
     jsonExit(['error' => 'Invalid role'], 400);
 }
@@ -65,35 +67,52 @@ $projectRoot = dirname(__DIR__);
 $clubEdited = null;
 $updatedExecs = null;
 
-// Optional club validation: only relevant when assigning/removing executives
-$projectRoot = dirname(__DIR__);
-$clubEdited = null;
-$updatedExecs = null;
-
 // If assigning the 'executive' role, require a club to be specified.
 // This prevents creating a global executive role with no club association.
-if ($role === 'executive') {
+if ($role === 'executive' || $role === 'advisor') {
     if ($clubDir === '') {
-        jsonExit(['error' => 'clubDir is required when assigning the executive role'], 400);
+        jsonExit(['error' => 'clubDir is required when assigning the executive or advisor role'], 400);
     }
 
     if (!preg_match('/^[a-z0-9\-_]+$/', $clubDir)) {
         jsonExit(['error' => 'Invalid club directory name'], 400);
     }
+
     $clubPath = $projectRoot . '/' . $clubDir;
     $drawerFile = $clubPath . '/drawer.json';
     if (!is_dir($clubPath) || !file_exists($drawerFile)) {
         jsonExit(['error' => 'Club not found: ' . $clubDir], 404);
     }
+
     if (!in_array($clubAction, ['', 'add', 'remove'], true)) {
         jsonExit(['error' => 'Invalid club action'], 400);
     }
+
     $clubEdited = $clubDir;
 } else {
-    // For non-executive roles: ignore clubDir (club doesn't apply),
-    // but keep clubAction so the backend can honor "remove" to revoke roles.
     $clubDir = '';
-    // $clubAction remains as provided (could be '', 'add', or 'remove')
+}
+
+$isAdmin = $currentUserRole === 'admin';
+$isAdvisorUser = $currentUserRole === 'advisor';
+$isExecutiveUser = $currentUserRole === 'executive';
+
+if (!$isAdmin) {
+    if ($clubEdited !== null) {
+        if ($isAdvisorUser) {
+            if (!club_user_is_advisor_of($clubEdited, $currentUserEmail)) {
+                jsonExit(['error' => 'Forbidden: you are not an advisor for this club'], 403);
+            }
+        } elseif ($isExecutiveUser) {
+            if (!club_user_is_executive_of($clubEdited, $currentUserEmail)) {
+                jsonExit(['error' => 'Forbidden: you are not an executive for this club'], 403);
+            }
+        } else {
+            jsonExit(['error' => 'Forbidden'], 403);
+        }
+    } else {
+        jsonExit(['error' => 'Forbidden'], 403);
+    }
 }
 
 // Decide what DB role to write based on requested role and clubAction
@@ -130,7 +149,7 @@ foreach ($emails as $email) {
             $name = explode('@', $email)[0];
             $createRole = $dbRoleForUpdate ?? 'student';
             $ins = $pdo->prepare("INSERT INTO users (name, email, google_id, role) VALUES (?, ?, ?, ?)");
-            $ins->execute([$name, $email, '', $createRole]);
+            $ins->execute([$name, $email, null, $createRole]);
             $row['created'] = true;
             // consider this a role change if created with a non-student role
             if ($createRole !== 'student') {
@@ -151,15 +170,39 @@ if ($clubEdited !== null && $clubAction !== '') {
     if (!is_array($drawer)) {
         jsonExit(['error' => 'Invalid drawer.json for club: ' . $clubEdited], 500);
     }
-    $execs = array_map('strtolower', $drawer['executiveEmails'] ?? []);
+    $targetKey = ($role === 'advisor') ? 'advisorEmails' : 'executiveEmails';
+    $existing = array_map('strtolower', $drawer[$targetKey] ?? []);
 
     if ($clubAction === 'add') {
-        $merged = array_unique(array_merge($execs, $emails));
-        $drawer['executiveEmails'] = array_values($merged);
+        $beforeAdd = $existing;
+        $merged = array_unique(array_merge($existing, $emails));
+        $drawer[$targetKey] = array_values($merged);
+
+        $addedToClub = array_diff($merged, $beforeAdd);
+        if (!empty($addedToClub)) {
+            foreach ($results as &$r) {
+                if (in_array($r['email'], $addedToClub, true)) {
+                    $r['club_added'] = $clubEdited;
+                }
+            }
+            unset($r);
+        }
     } elseif ($clubAction === 'remove') {
-        $drawer['executiveEmails'] = array_values(array_filter($execs, function($e) use ($emails) {
+        $beforeRemove = $existing;
+        $afterRemove = array_values(array_filter($existing, function($e) use ($emails) {
             return !in_array($e, $emails, true);
         }));
+        $drawer[$targetKey] = $afterRemove;
+
+        $removedFromClub = array_diff($beforeRemove, $afterRemove);
+        if (!empty($removedFromClub)) {
+            foreach ($results as &$r) {
+                if (in_array($r['email'], $removedFromClub, true)) {
+                    $r['club_removed'] = $clubEdited;
+                }
+            }
+            unset($r);
+        }
     }
 
     if (file_put_contents($drawerFile, json_encode($drawer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
@@ -170,35 +213,57 @@ if ($clubEdited !== null && $clubAction !== '') {
 }
 
 // --- Start: Demote users who are no longer executives in any club ---
-// Build a map of executive membership: email (lowercase) => true
+// Build maps of executive and advisor membership
 try {
     $clubsFile = $projectRoot . '/clubs.json';
     $allClubDirs = json_decode((string) file_get_contents($clubsFile), true);
     if (!is_array($allClubDirs)) $allClubDirs = [];
 
     $execMap = [];
+    $advisorMap = [];
+
     foreach ($allClubDirs as $cdir) {
         $drawerPath = $projectRoot . '/' . $cdir . '/drawer.json';
         if (!file_exists($drawerPath)) continue;
+
         $d = json_decode((string) file_get_contents($drawerPath), true);
         if (!is_array($d)) continue;
+
         $execs = array_map('strtolower', $d['executiveEmails'] ?? []);
+        $advisors = array_map('strtolower', $d['advisorEmails'] ?? []);
+
         foreach ($execs as $e) {
             $execMap[$e] = true;
+        }
+        foreach ($advisors as $a) {
+            $advisorMap[$a] = true;
         }
     }
 
     foreach ($emails as $email) {
         $emailLower = strtolower($email);
         $stillExec = isset($execMap[$emailLower]);
+        $stillAdvisor = isset($advisorMap[$emailLower]);
 
-        // If not executive anywhere, demote in DB (only if currently role = 'executive')
         if (!$stillExec) {
             $demoteStmt = $pdo->prepare("UPDATE users SET role = 'student' WHERE email = ? AND role = 'executive'");
             $demoteStmt->execute([$email]);
-
             if ($demoteStmt->rowCount() > 0) {
-                // Mark the result for this email: role_updated / demoted
+                foreach ($results as &$r) {
+                    if (isset($r['email']) && strtolower($r['email']) === $emailLower) {
+                        $r['role_updated'] = true;
+                        $r['demoted'] = true;
+                        break;
+                    }
+                }
+                unset($r);
+            }
+        }
+
+        if (!$stillAdvisor) {
+            $demoteStmt = $pdo->prepare("UPDATE users SET role = 'student' WHERE email = ? AND role = 'advisor'");
+            $demoteStmt->execute([$email]);
+            if ($demoteStmt->rowCount() > 0) {
                 foreach ($results as &$r) {
                     if (isset($r['email']) && strtolower($r['email']) === $emailLower) {
                         $r['role_updated'] = true;
@@ -211,7 +276,6 @@ try {
         }
     }
 } catch (Exception $e) {
-    // Non-fatal: attach an error to first result so admin sees something went wrong
     if (!empty($results)) {
         $results[0]['error'] = ($results[0]['error'] ? $results[0]['error'] . '; ' : '') . 'Demotion error: ' . $e->getMessage();
     }
@@ -224,7 +288,13 @@ $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) || (strpos($_SERVER['HTTP_AC
 if ($isAjax) {
     $response = ['success' => true, 'results' => $results];
     if ($clubEdited !== null) {
-        $response['club'] = ['dirName' => $clubEdited, 'executiveEmails' => $updatedExecs];
+        // Read current drawer to return authoritative lists
+        $drawer = json_decode((string) file_get_contents($projectRoot . '/' . $clubEdited . '/drawer.json'), true);
+        $response['club'] = [
+            'dirName' => $clubEdited,
+            'executiveEmails' => $drawer['executiveEmails'] ?? [],
+            'advisorEmails' => $drawer['advisorEmails'] ?? []
+        ];
     }
     jsonExit($response, 200);
 }

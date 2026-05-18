@@ -33,6 +33,8 @@ $user = $_SESSION['user'] ?? null;
             <a href="dashboard/dashboard.php">Admin Dashboard</a>
         <?php elseif ($isLoggedIn && $user['role'] === 'executive'): ?>
             <a href="dashboard/executive.php">Executive Dashboard</a>
+        <?php elseif ($isLoggedIn && $user['role'] === 'advisor'): ?>
+            <a href="dashboard/advisor.php">Advisor Dashboard</a>
         <?php else: ?>
             <a href="#">Dashboard</a>
         <?php endif; ?>
@@ -40,9 +42,9 @@ $user = $_SESSION['user'] ?? null;
 
     <div class="auth">
         <?php if ($isLoggedIn): ?>
-            <span style="color: var(--muted); font-size: 14px; padding: 0 12px; display: flex; align-items: center;">
+            <a class="btn btn-ghost" >
                 <?= htmlspecialchars($user['name']) ?>
-            </span>
+            </a>
             <a class="btn btn-ghost" href="auth/logout.php">Logout</a>
         <?php else: ?>
             <a class="btn btn-ghost" href="auth/login.php">Log In</a>
@@ -80,6 +82,7 @@ $user = $_SESSION['user'] ?? null;
                 <button class="chip" data-filter="Academic">Academic</button>
                 <button class="chip" data-filter="Arts & Culture">Arts & Culture</button>
                 <button class="chip" data-filter="Community Service">Community Service</button>
+                <button class="chip" data-filter="Journalism">Journalism</button>
                 <button class="chip" data-filter="Sports">Sports</button>
             </div>
 

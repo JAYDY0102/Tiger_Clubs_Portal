@@ -59,7 +59,7 @@ $staffUrl = buildGoogleAuthUrl(
             <a class="btn btn-primary" href="<?= htmlspecialchars($studentUrl, ENT_QUOTES) ?>">
                 Student Sign In
             </a>
-            <a class="btn btn-ghost" href="<?= htmlspecialchars($staffUrl, ENT_QUOTES) ?>">
+            <a class="btn btn-primary" href="<?= htmlspecialchars($staffUrl, ENT_QUOTES) ?>">
                 Staff Sign In
             </a>
         </div>

@@ -49,10 +49,22 @@ function club_user_is_executive_of(string $slug, string $email): bool
     return in_array(strtolower($email), $execs, true);
 }
 
+function club_user_is_advisor_of(string $slug, string $email): bool
+{
+    $drawer = club_load_drawer($slug);
+    if ($drawer === false) {
+        return false;
+    }
+
+    $advisors = array_map('strtolower', $drawer['advisorEmails'] ?? []);
+    return in_array(strtolower($email), $advisors, true);
+}
+
 function club_resolve_for_management(array $user, string $clubDir): array
 {
     $isAdmin = ($user['role'] ?? '') === 'admin';
     $isExecutive = ($user['role'] ?? '') === 'executive';
+    $isAdvisor = ($user['role'] ?? '') === 'advisor';
 
     if (!club_is_valid_slug($clubDir)) {
         return ['ok' => false, 'status' => 400, 'error' => 'Invalid club name'];
@@ -64,7 +76,11 @@ function club_resolve_for_management(array $user, string $clubDir): array
     }
 
     if (!$isAdmin) {
-        if (!$isExecutive || !club_user_is_executive_of($clubDir, (string)($user['email'] ?? ''))) {
+        $email = (string)($user['email'] ?? '');
+        $isExecForClub = $isExecutive && club_user_is_executive_of($clubDir, $email);
+        $isAdvisorForClub = $isAdvisor && club_user_is_advisor_of($clubDir, $email);
+
+        if (!($isExecForClub || $isAdvisorForClub)) {
             return ['ok' => false, 'status' => 403, 'error' => 'Forbidden'];
         }
     }

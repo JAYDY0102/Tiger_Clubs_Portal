@@ -101,6 +101,11 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                         <div class="execs-list" id="execList">None assigned</div>
                     </div>
 
+                    <div class="advisors-section">
+                        <div class="advisors-label">Advisors</div>
+                        <div class="advisors-list" id="advisorList">None assigned</div>
+                    </div>
+
                     <div class="upload-section">
                         <label class="upload-label" for="bannerInput">
                             Upload Banner
@@ -133,6 +138,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                                     <option>Academic</option>
                                     <option>Arts & Culture</option>
                                     <option>Community Service</option>
+                                    <option>Journalism</option>
                                     <option>Sports</option>
                                     <option>Other</option>
                                 </select>
@@ -232,7 +238,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                         <label for="bulkRole">Role</label>
                         <select id="bulkRole">
                             <option value="student">student</option>
-                            <option value="teacher">teacher</option>
+                            <option value="advisor">advisor</option>
                             <option value="executive" selected>executive</option>
                             <option value="admin">admin</option>
                         </select>
@@ -328,6 +334,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
 
 <script>
     const el = {
+        advisorList: document.getElementById('advisorList'),
         clubSearch: document.getElementById('clubSearch'),
         clubSelect: document.getElementById('clubSelect'),
         clubEditForm: document.getElementById('clubEditForm'),
@@ -416,6 +423,10 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
         const execEmails = Array.isArray(data.executiveEmails) ? data.executiveEmails : [];
         el.execList.textContent = execEmails.length ? execEmails.join(', ') : 'None assigned';
 
+        const advisorEmails = Array.isArray(data.advisorEmails) ? data.advisorEmails : [];
+        if (el.advisorList) {
+            el.advisorList.textContent = advisorEmails.length ? advisorEmails.join(', ') : 'None assigned';
+        }
         if (data.image) {
             el.bannerPreview.innerHTML = `<img src="${imageApiUrl(data.image, 400, 200)}" alt="${data.name || clubDir}" />`;
         } else {
@@ -571,7 +582,15 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                 } else {
                     const parts = [];
                     if (r.created) parts.push('created');
-                    if (r.role_updated) parts.push('role updated');
+                    if (r.club_added) {
+                        const clubName = r.club_added.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        parts.push(`added to ${clubName}`);
+                    }
+                    if (r.club_removed) {
+                        const clubName = r.club_removed.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        parts.push(`removed from ${clubName}`);
+                    }
+                    if (r.role_updated && !r.club_added && !r.club_removed) parts.push('role updated');
                     if (r.demoted) parts.push('demoted');
                     status = parts.length ? parts.join(' & ') : 'no change';
                 }
@@ -583,11 +602,19 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
         if (json.club) {
             const dir = json.club.dirName || json.club.clubDir || 'Unknown';
             html += `<div style="margin-top:8px;"><strong>Club: ${dir}</strong><br />`;
+
             if (json.club.executiveEmails && json.club.executiveEmails.length) {
-                html += `<small>Executives: ${json.club.executiveEmails.join(', ')}</small>`;
+                html += `<small>Executives: ${json.club.executiveEmails.join(', ')}</small><br />`;
             } else {
-                html += '<small>No executives assigned.</small>';
+                html += '<small>No executives assigned.</small><br />';
             }
+
+            if (json.club.advisorEmails && json.club.advisorEmails.length) {
+                html += `<small>Advisors: ${json.club.advisorEmails.join(', ')}</small>`;
+            } else {
+                html += '<small>No advisors assigned.</small>';
+            }
+
             html += '</div>';
         }
 
@@ -598,7 +625,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
     // Show/disable club selection only when role === 'executive'; show Action for all roles.
     function updateBulkUiForRole() {
         const role = el.bulkRole?.value;
-        const needsClub = (role === 'executive');
+        const needsClub = (role === 'executive' || role === 'advisor');
         const needsAction = (typeof role !== 'undefined' && role !== null && role !== '');
 
         // Show/hide club selector only for executives
@@ -653,9 +680,9 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                 return;
             }
 
-            // If role is executive and an action was chosen, require a club
-            if (role === 'executive' && action && !club) {
-                alert('Select a club to add/remove executives.');
+            // If role is executive or advisor and an action was chosen, require a club
+            if ((role === 'executive' || role === 'advisor') && action && !club) {
+                alert('Select a club to add/remove executives or advisors.');
                 return;
             }
 
@@ -675,8 +702,8 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
             // Always include the action when provided (backend will interpret appropriately for non-exec roles)
             if (action) fd.append('clubAction', action);
 
-            // Only include clubDir for executive role
-            if (role === 'executive' && club) {
+            // Include clubDir for executive or advisor role
+            if ((role === 'executive' || role === 'advisor') && club) {
                 fd.append('clubDir', club);
             }
 

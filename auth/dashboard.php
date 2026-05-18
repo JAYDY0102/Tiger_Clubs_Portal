@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['email'] ?? '';
     $role = $_POST['role'] ?? '';
 
-    $allowedRoles = ['student', 'teacher', 'executive', 'admin'];
+    $allowedRoles = ['student', 'advisor', 'executive', 'admin'];
 
     if ($email && in_array($role, $allowedRoles, true)) {
         $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE email = ?");
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <select name="role" required>
                     <option value="">-- Select a role --</option>
                     <option value="student">student</option>
-                    <option value="teacher">teacher</option>
+                    <option value="advisor">advisor</option>
                     <option value="executive">executive</option>
                     <option value="admin">admin</option>
                 </select>

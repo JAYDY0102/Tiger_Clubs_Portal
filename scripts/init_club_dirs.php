@@ -94,6 +94,7 @@ foreach ($clubDirs as $dirName) {
         'instagram' => '',
         'website' => '',
         'executiveEmails' => [],
+        'advisorEmails' => [],
         'meeting' => [
             'day' => '',
             'location' => '',
@@ -101,8 +102,24 @@ foreach ($clubDirs as $dirName) {
         ],
         'posts' => []
     ];
+// helper to validate/normalize email list: lower-case, valid emails only, dedupe, preserve order
+    $normalizeEmails = function (array $list): array {
+        $out = [];
+        $seen = [];
+        foreach ($list as $e) {
+            $s = trim((string)$e);
+            if ($s === '') continue;
+            $s = strtolower($s);
+            if (!filter_var($s, FILTER_VALIDATE_EMAIL)) continue;
+            if (isset($seen[$s])) continue;
+            $seen[$s] = true;
+            $out[] = $s;
+        }
+        return $out;
+    };
 
     if (!file_exists($drawerFile)) {
+        // Create new drawer.json from default
         $json = json_encode($default, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if (file_put_contents($drawerFile, $json) !== false) {
             fwrite(STDOUT, "  Created default drawer.json for $dirName\n");
@@ -110,7 +127,71 @@ foreach ($clubDirs as $dirName) {
             fwrite(STDERR, "  Failed to write drawer.json for $dirName\n");
         }
     } else {
-        fwrite(STDOUT, "  drawer.json exists for $dirName\n");
+        // Load existing drawer, ensure keys exist, migrate advisor -> advisorEmails, normalize lists
+        $raw = file_get_contents($drawerFile);
+        $drawer = json_decode((string)$raw, true);
+        if (!is_array($drawer)) {
+            fwrite(STDERR, "  Invalid JSON in drawer.json for $dirName — skipping\n");
+        } else {
+            $changed = false;
+
+            // Ensure keys exist (merge default keys)
+            foreach ($default as $k => $v) {
+                if (!array_key_exists($k, $drawer)) {
+                    $drawer[$k] = $v;
+                    $changed = true;
+                }
+            }
+
+            // If single 'advisor' string is set and advisorEmails is empty or doesn't contain it, migrate it.
+            if (!empty($drawer['advisor']) && is_string($drawer['advisor'])) {
+                $advisorSingle = trim((string)$drawer['advisor']);
+                if ($advisorSingle !== '') {
+                    $lower = strtolower($advisorSingle);
+                    $existingAdv = array_map('strtolower', $drawer['advisorEmails'] ?? []);
+                    if (!in_array($lower, $existingAdv, true)) {
+                        $drawer['advisorEmails'][] = $advisorSingle;
+                        $changed = true;
+                    }
+                }
+            }
+
+            // Normalize and clean executiveEmails and advisorEmails arrays
+            $prevExec = $drawer['executiveEmails'] ?? [];
+            $prevAdv = $drawer['advisorEmails'] ?? [];
+
+            $normExec = $normalizeEmails(is_array($prevExec) ? $prevExec : []);
+            $normAdv = $normalizeEmails(is_array($prevAdv) ? $prevAdv : []);
+
+            if ($normExec !== $prevExec) {
+                $drawer['executiveEmails'] = $normExec;
+                $changed = true;
+            } else {
+                // still ensure array type and values set to normalized lower-case
+                $drawer['executiveEmails'] = $normExec;
+            }
+
+            if ($normAdv !== $prevAdv) {
+                $drawer['advisorEmails'] = $normAdv;
+                $changed = true;
+            } else {
+                $drawer['advisorEmails'] = $normAdv;
+            }
+
+            // Optional: ensure advisorEmails does not accidentally contain items duplicated in executiveEmails,
+            // or keep them separate depending on your policy. Here we keep them independent.
+
+            if ($changed) {
+                $json = json_encode($drawer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                if ($json !== false && file_put_contents($drawerFile, $json) !== false) {
+                    fwrite(STDOUT, "  Updated drawer.json for $dirName (normalized/migrated fields)\n");
+                } else {
+                    fwrite(STDERR, "  Failed to write updated drawer.json for $dirName\n");
+                }
+            } else {
+                fwrite(STDOUT, "  drawer.json OK for $dirName\n");
+            }
+        }
     }
 
     // create placeholder main.png if missing

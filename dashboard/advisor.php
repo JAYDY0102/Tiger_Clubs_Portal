@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 session_start();
+
 $pdo = require __DIR__ . '/../auth/db.php';
 require_once __DIR__ . '/../auth/club-utils.php';
 
@@ -9,12 +10,13 @@ if (!isset($_SESSION['user'])) {
     header('Location: ../auth/login.php');
     exit;
 }
+
 $user = $_SESSION['user'];
-$isExecutive = ($user['role'] ?? '') === 'executive';
+$isAdvisor = ($user['role'] ?? '') === 'advisor';
 $userEmail = isset($user['email']) ? (string) $user['email'] : '';
 
-// Admins should use the full admin dashboard; this is for executives only
-if (!$isExecutive) {
+// Advisors only
+if (!$isAdvisor) {
     header('Location: ../index.php');
     exit;
 }
@@ -24,27 +26,24 @@ $clubsFile = $projectRoot . '/clubs.json';
 $clubDirsRaw = json_decode((string) file_get_contents($clubsFile), true);
 $clubDirs = is_array($clubDirsRaw) ? $clubDirsRaw : [];
 
-// Filter to only clubs this executive manages
-$execClubDirs = [];
+// Filter to only clubs this advisor manages
+$advisorClubDirs = [];
 foreach ($clubDirs as $d) {
     $dir = (string) $d;
-    if (club_user_is_executive_of($dir, $userEmail)) {
-        $execClubDirs[] = $dir;
+    if (club_user_is_advisor_of($dir, $userEmail)) {
+        $advisorClubDirs[] = $dir;
     }
 }
 
-if (empty($execClubDirs)) {
-    $noClubs = true;
-} else {
-    $noClubs = false;
-}
+$noClubs = empty($advisorClubDirs);
+$allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC")->fetchAll();
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Executive Dashboard — Club Management</title>
+    <title>Advisor Dashboard — Club Management</title>
     <link rel="stylesheet" href="../styles.css" />
     <script>
         const currentAdminEmail = <?= json_encode($userEmail) ?>;
@@ -54,7 +53,7 @@ if (empty($execClubDirs)) {
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
-        <span>Tiger Clubs Portal — Executive Dashboard</span>
+        <span>Tiger Clubs Portal — Advisor Dashboard</span>
     </div>
     <nav class="nav">
         <a href="../index.php">Home</a>
@@ -66,7 +65,7 @@ if (empty($execClubDirs)) {
     <?php if ($noClubs): ?>
         <div class="admin-panel">
             <h2>No Clubs Assigned</h2>
-            <p>You are not assigned as an executive for any clubs yet. Contact an admin to assign you to a club.</p>
+            <p>You are not assigned as an advisor for any clubs yet. Contact an admin to assign you to a club.</p>
             <p><a href="../index.php" class="btn btn-primary">Back to Home</a></p>
         </div>
     <?php else: ?>
@@ -82,7 +81,7 @@ if (empty($execClubDirs)) {
                             <label for="clubSelect" class="sr-only">Select club</label>
                             <select id="clubSelect" size="10">
                                 <option value="">— Select a club —</option>
-                                <?php foreach ($execClubDirs as $d):
+                                <?php foreach ($advisorClubDirs as $d):
                                     $dir = (string) $d;
                                     $label = ucwords(str_replace(['-', '_'], ' ', $dir));
                                     ?>
@@ -109,6 +108,11 @@ if (empty($execClubDirs)) {
                         <div class="execs-section">
                             <div class="execs-label">Executives</div>
                             <div class="execs-list" id="execList">None assigned</div>
+                        </div>
+
+                        <div class="advisors-section">
+                            <div class="advisors-label">Advisors</div>
+                            <div class="advisors-list" id="advisorList">None assigned</div>
                         </div>
 
                         <div class="upload-section">
@@ -228,11 +232,61 @@ if (empty($execClubDirs)) {
                 </div>
             </div>
         </div>
+
+        <div class="admin-panel" style="margin-top:24px;">
+            <h2>Bulk Assign Roles</h2>
+            <form id="bulkForm">
+                <div class="bulk-form-row">
+                    <div class="form-group">
+                        <label for="bulkEmails">Emails</label>
+                        <input id="bulkEmails" type="text" placeholder="alice@siskorea.org, bob@stu.siskorea.org" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulkRole">Role</label>
+                        <select id="bulkRole">
+                            <option value="advisor" selected>advisor</option>
+                            <option value="executive">executive</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulkClub">Club</label>
+                        <select id="bulkClub">
+                            <option value="">—</option>
+                            <?php foreach ($advisorClubDirs as $d):
+                                $dir = (string) $d;
+                                $label = ucwords(str_replace(['-', '_'], ' ', $dir));
+                                ?>
+                                <option value="<?= htmlspecialchars($dir) ?>"><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulkAction">Action</label>
+                        <select id="bulkAction">
+                            <option value="">None</option>
+                            <option value="add">Add</option>
+                            <option value="remove">Remove</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="bulkClear" class="btn btn-ghost">Clear</button>
+                        <button type="submit" class="btn btn-primary">Assign</button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="bulkResult" class="bulk-result"></div>
+        </div>
     <?php endif; ?>
 </main>
 
 <script>
     const el = {
+        advisorList: document.getElementById('advisorList'),
         clubSearch: document.getElementById('clubSearch'),
         clubSelect: document.getElementById('clubSelect'),
         clubEditForm: document.getElementById('clubEditForm'),
@@ -246,6 +300,13 @@ if (empty($execClubDirs)) {
         uploadStatus: document.getElementById('uploadStatus'),
         resultBox: document.getElementById('resultBox'),
         bannerInput: document.getElementById('bannerInput'),
+        bulkForm: document.getElementById('bulkForm'),
+        bulkEmails: document.getElementById('bulkEmails'),
+        bulkRole: document.getElementById('bulkRole'),
+        bulkClub: document.getElementById('bulkClub'),
+        bulkAction: document.getElementById('bulkAction'),
+        bulkResult: document.getElementById('bulkResult'),
+        bulkClear: document.getElementById('bulkClear'),
         clubName: document.getElementById('clubName'),
         clubTypeSelect: document.getElementById('clubTypeSelect'),
         clubSummary: document.getElementById('clubSummary'),
@@ -282,6 +343,9 @@ if (empty($execClubDirs)) {
         el.clubDay.textContent = '—';
         el.clubMembers.textContent = '0';
         el.execList.textContent = 'None assigned';
+        if (el.advisorList) {
+            el.advisorList.textContent = 'None assigned';
+        }
         el.bannerPreview.innerHTML = '<div id="bannerPlaceholder" style="color:var(--muted);">No image</div>';
     }
 
@@ -313,6 +377,11 @@ if (empty($execClubDirs)) {
 
         const execEmails = Array.isArray(data.executiveEmails) ? data.executiveEmails : [];
         el.execList.textContent = execEmails.length ? execEmails.join(', ') : 'None assigned';
+
+        const advisorEmails = Array.isArray(data.advisorEmails) ? data.advisorEmails : [];
+        if (el.advisorList) {
+            el.advisorList.textContent = advisorEmails.length ? advisorEmails.join(', ') : 'None assigned';
+        }
 
         if (data.image) {
             el.bannerPreview.innerHTML = `<img src="${imageApiUrl(data.image, 400, 200)}" alt="${data.name || clubDir}" />`;
@@ -456,6 +525,154 @@ if (empty($execClubDirs)) {
             el.uploadStatus.textContent = 'Error uploading banner';
         }
     });
+
+    function buildBulkResultHtml(json) {
+        let html = '<strong>Assignment Results:</strong><ul>';
+
+        if (json.results) {
+            for (const r of json.results) {
+                let status = '';
+                if (r.error) {
+                    status = 'Error: ' + r.error;
+                } else {
+                    const parts = [];
+                    if (r.created) parts.push('created');
+                    if (r.club_added) {
+                        const clubName = r.club_added.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        parts.push(`added to ${clubName}`);
+                    }
+                    if (r.club_removed) {
+                        const clubName = r.club_removed.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        parts.push(`removed from ${clubName}`);
+                    }
+                    if (r.role_updated && !r.club_added && !r.club_removed) parts.push('role updated');
+                    if (r.demoted) parts.push('demoted');
+                    status = parts.length ? parts.join(' & ') : 'no change';
+                }
+                html += `<li><strong>${r.email}</strong> — ${status}</li>`;
+            }
+        }
+        html += '</ul>';
+
+        if (json.club) {
+            const dir = json.club.dirName || json.club.clubDir || 'Unknown';
+            html += `<div style="margin-top:8px;"><strong>Club: ${dir}</strong><br />`;
+
+            if (json.club.executiveEmails && json.club.executiveEmails.length) {
+                html += `<small>Executives: ${json.club.executiveEmails.join(', ')}</small><br />`;
+            } else {
+                html += '<small>No executives assigned.</small><br />';
+            }
+
+            if (json.club.advisorEmails && json.club.advisorEmails.length) {
+                html += `<small>Advisors: ${json.club.advisorEmails.join(', ')}</small>`;
+            } else {
+                html += '<small>No advisors assigned.</small>';
+            }
+
+            html += '</div>';
+        }
+
+        return html;
+    }
+
+    function updateBulkUiForRole() {
+        const role = el.bulkRole?.value;
+        const needsClub = (role === 'executive' || role === 'advisor');
+        const needsAction = (typeof role !== 'undefined' && role !== null && role !== '');
+
+        if (el.bulkClub) {
+            const clubGroup = el.bulkClub.closest('.form-group');
+            if (clubGroup) clubGroup.style.display = needsClub ? '' : 'none';
+            el.bulkClub.disabled = !needsClub;
+        }
+
+        if (el.bulkAction) {
+            const actionGroup = el.bulkAction.closest('.form-group');
+            if (actionGroup) actionGroup.style.display = needsAction ? '' : 'none';
+            el.bulkAction.disabled = !needsAction;
+        }
+    }
+
+    updateBulkUiForRole();
+
+    if (el.bulkRole) {
+        el.bulkRole.addEventListener('change', () => {
+            updateBulkUiForRole();
+        });
+    }
+
+    if (el.bulkClear) {
+        el.bulkClear.addEventListener('click', () => {
+            if (el.bulkEmails) el.bulkEmails.value = '';
+            if (el.bulkRole) el.bulkRole.value = 'advisor';
+            if (el.bulkClub) el.bulkClub.value = '';
+            if (el.bulkAction) el.bulkAction.value = '';
+            if (el.bulkResult) {
+                el.bulkResult.classList.remove('show');
+                el.bulkResult.textContent = '';
+            }
+            updateBulkUiForRole();
+        });
+    }
+
+    if (el.bulkForm) {
+        el.bulkForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emails = (el.bulkEmails && el.bulkEmails.value) ? el.bulkEmails.value.trim() : '';
+            const role = el.bulkRole ? el.bulkRole.value : '';
+            const club = el.bulkClub ? el.bulkClub.value : '';
+            const action = el.bulkAction ? el.bulkAction.value : '';
+
+            if (!emails) {
+                alert('Enter at least one email');
+                return;
+            }
+
+            if ((role === 'executive' || role === 'advisor') && action && !club) {
+                alert('Select a club to add/remove executives or advisors.');
+                return;
+            }
+
+            if (action === 'remove' && role === 'admin') {
+                if (typeof currentAdminEmail !== 'undefined' && emails.toLowerCase().includes(currentAdminEmail.toLowerCase())) {
+                    if (!confirm('You are about to remove admin privileges for yourself. This will revoke your admin access. Continue?')) {
+                        return;
+                    }
+                }
+            }
+
+            const fd = new FormData();
+            fd.append('emails', emails);
+            fd.append('role', role);
+
+            if (action) fd.append('clubAction', action);
+
+            if ((role === 'executive' || role === 'advisor') && club) {
+                fd.append('clubDir', club);
+            }
+
+            try {
+                const { json } = await fetchJson('/dashboard/assign-role.php', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: fd
+                });
+
+                if (el.bulkResult) {
+                    el.bulkResult.classList.add('show');
+                    el.bulkResult.innerHTML = buildBulkResultHtml(json);
+                }
+                if (el.bulkEmails) el.bulkEmails.value = '';
+            } catch (err) {
+                console.error(err);
+                if (el.bulkResult) {
+                    el.bulkResult.classList.add('show');
+                    el.bulkResult.innerHTML = '<strong>Error</strong>';
+                }
+            }
+        });
+    }
 </script>
 </body>
 </html>
