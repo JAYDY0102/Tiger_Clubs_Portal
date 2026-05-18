@@ -12,8 +12,8 @@ if (!isset($_SESSION['user'])) {
 
 $user = $_SESSION['user'];
 $isAdmin = ($user['role'] ?? '') === 'admin';
-$isExecutive = ($user['role'] ?? '') === 'executive';
 $userEmail = isset($user['email']) ? (string) $user['email'] : '';
+$isLoggedIn = isset($_SESSION['user']);
 
 $projectRoot = dirname(__DIR__);
 $clubsFile = $projectRoot . '/clubs.json';
@@ -45,15 +45,39 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
     </script>
 </head>
 <body>
+
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
         <span>Tiger Clubs Portal — Dashboard</span>
     </div>
+
     <nav class="nav">
-        <a href="../index.php">Home</a>
-        <a href="../auth/logout.php">Logout</a>
+        <a href="../index.php" class="inactive">Home</a>
+        <a href="#" class="inactive">Feed</a>
+        <a href="#" class="inactive">Calendar</a>
+        <?php if ($isLoggedIn && $user['role'] === 'admin'): ?>
+            <a href="dashboard.php" class="active">Admin Dashboard</a>
+        <?php elseif ($isLoggedIn && $user['role'] === 'executive' ): ?>
+            <a href="executive.php" class="active">Executive Dashboard</a>
+        <?php elseif ($isLoggedIn && $user['role'] === 'advisor'): ?>
+            <a href="advisor.php" class="active">Advisor Dashboard</a>
+        <?php else: ?>
+            <a href="#" class="active">Dashboard</a>
+        <?php endif; ?>
     </nav>
+
+    <div class="auth">
+        <?php if ($isLoggedIn): ?>
+            <a class="btn btn-ghost" >
+                <?= htmlspecialchars($user['name']) ?>
+            </a>
+            <a class="btn btn-ghost" href="../auth/logout.php">Logout</a>
+        <?php else: ?>
+            <a class="btn btn-ghost" href="../auth/login.php">Log In</a>
+            <a class="btn btn-primary" href="../auth/login.php">Sign Up</a>
+        <?php endif; ?>
+    </div>
 </header>
 
 <main class="dashboard-main">

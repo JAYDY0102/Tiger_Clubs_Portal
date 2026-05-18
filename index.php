@@ -27,14 +27,14 @@ $user = $_SESSION['user'] ?? null;
 
     <nav class="nav">
         <a href="index.php" class="active">Home</a>
-        <a href="#">Feed</a>
-        <a href="#">Calendar</a>
+        <a href="#" class="inactive">Feed</a>
+        <a href="#" class="inactive">Calendar</a>
         <?php if ($isLoggedIn && $user['role'] === 'admin'): ?>
-            <a href="dashboard/dashboard.php">Admin Dashboard</a>
-        <?php elseif ($isLoggedIn && $user['role'] === 'executive'): ?>
-            <a href="dashboard/executive.php">Executive Dashboard</a>
+            <a href="dashboard/dashboard.php" class="inactive">Admin Dashboard</a>
+        <?php elseif ($isLoggedIn && $user['role'] === 'executive' ): ?>
+            <a href="dashboard/executive.php" class="inactive">Executive Dashboard</a>
         <?php elseif ($isLoggedIn && $user['role'] === 'advisor'): ?>
-            <a href="dashboard/advisor.php">Advisor Dashboard</a>
+            <a href="dashboard/advisor.php" class="inactive">Advisor Dashboard</a>
         <?php else: ?>
             <a href="#">Dashboard</a>
         <?php endif; ?>
@@ -57,7 +57,7 @@ $user = $_SESSION['user'] ?? null;
     <section class="hero">
         <div class="hero-overlay"></div>
         <div class="hero-content">
-            <h1>Discover Clubs<br><span>at SIS</span></h1>
+            <h1>Discover Clubs <span>at SIS</span></h1>
             <p>Find your passion, make lasting memories, and develop new skills through our diverse range of student clubs.</p>
 
             <div class="search-wrap">
