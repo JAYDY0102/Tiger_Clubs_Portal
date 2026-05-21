@@ -59,8 +59,8 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
 
     <nav class="nav">
         <a href="../index.php" class="inactive">Home</a>
-        <a href="#" class="inactive">Feed</a>
-        <a href="#" class="inactive">Calendar</a>
+        <a href="/feed" class="inactive">Feed</a>
+        <a href="/calendar" class="inactive">Calendar</a>
         <?php if ($isLoggedIn && $user['role'] === 'admin'): ?>
             <a href="dashboard.php" class="active">Admin Dashboard</a>
         <?php elseif ($isLoggedIn && $user['role'] === 'executive' ): ?>

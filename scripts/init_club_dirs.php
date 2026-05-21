@@ -99,8 +99,7 @@ foreach ($clubDirs as $dirName) {
             'day' => '',
             'location' => '',
             'time' => ''
-        ],
-        'posts' => []
+        ]
     ];
 // helper to validate/normalize email list: lower-case, valid emails only, dedupe, preserve order
     $normalizeEmails = function (array $list): array {

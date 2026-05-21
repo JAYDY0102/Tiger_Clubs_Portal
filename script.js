@@ -268,8 +268,7 @@ function buildUpdatePayload(form, club) {
             day: form.day.value,
             location: form.location.value,
             time: form.time.value
-        },
-        posts: club.posts ?? []
+        }
     }));
     return payload;
 }
@@ -322,24 +321,6 @@ function renderContactSection(club) {
     `;
 }
 
-function renderPostsSection(club) {
-    const posts = (club.posts ?? [])
-        .map((post) => `
-            <div class="post">
-                <div class="meta">${post.date}</div>
-                <div>${post.text}</div>
-            </div>
-        `)
-        .join("");
-
-    return `
-        <div class="section-box">
-            <h4>Posts</h4>
-            <div class="post-list">${posts}</div>
-        </div>
-    `;
-}
-
 function openDrawer(club) {
     const showManageButton = canManageClub(club);
     const bannerUrl = imageApiUrl(club.image, 840, 420);
@@ -378,7 +359,6 @@ function openDrawer(club) {
         </div>
         
         ${contactHtml}
-        ${renderPostsSection(club)}
     `;
 
     layout.classList.add("drawer-open");

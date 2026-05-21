@@ -24,14 +24,14 @@ $allowedFields = [
     'name',
     'type',
     'day',
+    'members',
     'summary',
     'about',
     'advisor',
     'contactEmail',
     'instagram',
     'website',
-    'meeting',
-    'posts'
+    'meeting'
 ];
 
 foreach ($allowedFields as $field) {
