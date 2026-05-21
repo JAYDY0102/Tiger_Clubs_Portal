@@ -257,6 +257,7 @@ function buildUpdatePayload(form, club) {
         name: form.name.value,
         type: form.type.value,
         day: form.day.value,
+        members: form.members.value,
         summary: form.summary.value,
         about: form.about.value,
         advisor: form.advisor.value,
@@ -342,8 +343,10 @@ function renderPostsSection(club) {
 function openDrawer(club) {
     const showManageButton = canManageClub(club);
     const bannerUrl = imageApiUrl(club.image, 840, 420);
-    const contactHtml = renderContactSection(club);
-
+    let contactHtml = "";
+    if (isLoggedIn){
+        contactHtml = renderContactSection(club);
+    }
     drawerContent.innerHTML = `
         <div class="drawer-banner">
             <img src="${bannerUrl}" alt="${club.name}" />
@@ -373,7 +376,7 @@ function openDrawer(club) {
             <p><strong>Location:</strong> ${club.meeting?.location ?? "TBA"}</p>
             <p><strong>Time:</strong> ${club.meeting?.time ?? "TBA"}</p>
         </div>
-
+        
         ${contactHtml}
         ${renderPostsSection(club)}
     `;

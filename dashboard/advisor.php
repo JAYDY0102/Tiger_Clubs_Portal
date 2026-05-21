@@ -129,14 +129,14 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                             </div>
                         </div>
 
-                        <div class="execs-section">
-                            <div class="execs-label">Executives</div>
-                            <div class="execs-list" id="execList">None assigned</div>
+                        <div class="roles-section">
+                            <div class="roles-label">Executives</div>
+                            <div class="roles-list" id="execList">None assigned</div>
                         </div>
 
-                        <div class="advisors-section">
-                            <div class="advisors-label">Advisors</div>
-                            <div class="advisors-list" id="advisorList">None assigned</div>
+                        <div class="roles-section">
+                            <div class="roles-label">Advisors</div>
+                            <div class="roles-list" id="advisorList">None assigned</div>
                         </div>
 
                         <div class="upload-section">

@@ -70,6 +70,14 @@ a {
     place-items: center;
 }
 
+.brand a{
+    transition: 0.3s ease;
+}
+
+.brand a:hover {
+    color: var(--accent);
+}
+
 .nav {
     position: absolute;
     left: 50%;
@@ -552,6 +560,7 @@ a {
     box-shadow: var(--shadow);
     padding: 24px;
     margin-bottom: 20px;
+    font-family: unified, sans-serif;
 }
 
 .auth-choice {
@@ -717,7 +726,7 @@ a {
     margin-bottom: 4px;
 }
 
-.execs-section {
+.roles-section {
     margin-bottom: 12px;
     padding: 10px;
     background: #fff;
@@ -725,14 +734,14 @@ a {
     border: 1px solid var(--line);
 }
 
-.execs-label {
+.roles-label {
     font-size: 12px;
     font-weight: 600;
     color: var(--muted);
     margin-bottom: 6px;
 }
 
-.execs-list {
+.roles-list {
     font-size: 13px;
     color: var(--text);
     word-break: break-all;

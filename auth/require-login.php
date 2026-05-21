@@ -19,10 +19,13 @@ if ($isLoggedIn) {
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
-        <span>Tiger Clubs Portal</span>
+        <span><a href="../index.php">Tiger Clubs Portal</a></span>
     </div>
     <nav class="nav">
-        <a href="../index.php">Home</a>
+        <a href="../index.php" class="inactive">Home</a>
+        <a href="#" class="inactive">Feed</a>
+        <a href="#" class="inactive">Calendar</a>
+        <a href="#" class="inactive">Dashboard</a>
     </nav>
 </header>
 
@@ -31,16 +34,14 @@ if ($isLoggedIn) {
         <h1>Login Required</h1>
         <p>You must be logged in to access this feature.</p>
         <p style="font-size: 14px; color: var(--muted); margin-top: 12px;">Please sign in with your SIS account to continue.</p>
-
-        <div style="margin-top: 24px;">
-            <a class="btn btn-primary" href="login.php" style="width: 100%; text-align: center; display: inline-block;">
+        <div class="auth-choice">
+            <a class="btn btn-primary" href="login.php">
                 Sign In
             </a>
+            <a class="btn btn-primary" href="../index.php">
+                Back to Home
+            </a>
         </div>
-
-        <p style="margin-top: 16px; text-align: center;">
-            <a href="../index.php" style="color: var(--accent); text-decoration: none;">Back to Home</a>
-        </p>
     </div>
 </main>
 </body>

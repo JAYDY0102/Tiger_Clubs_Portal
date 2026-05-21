@@ -131,9 +131,14 @@ if (empty($execClubDirs)) {
                             </div>
                         </div>
 
-                        <div class="execs-section">
-                            <div class="execs-label">Executives</div>
-                            <div class="execs-list" id="execList">None assigned</div>
+                        <div class="roles-section">
+                            <div class="roles-label">Executives</div>
+                            <div class="roles-list" id="execList">None assigned</div>
+                        </div>
+
+                        <div class="roles-section">
+                            <div class="roles-label">Advisors</div>
+                            <div class="roles-list" id="advisorList">None assigned</div>
                         </div>
 
                         <div class="upload-section">

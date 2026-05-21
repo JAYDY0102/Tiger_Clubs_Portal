@@ -12,6 +12,7 @@ if (!isset($_SESSION['user'])) {
 
 $user = $_SESSION['user'];
 $isAdmin = ($user['role'] ?? '') === 'admin';
+$isExecutive = ($user['role'] ?? '') === 'executive';
 $userEmail = isset($user['email']) ? (string) $user['email'] : '';
 $isLoggedIn = isset($_SESSION['user']);
 
@@ -49,7 +50,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
-        <span>Tiger Clubs Portal — Dashboard</span>
+        <span><a href="../index.php">Tiger Clubs Portal</a> — Dashboard</span>
     </div>
 
     <nav class="nav">
@@ -120,14 +121,14 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                         </div>
                     </div>
 
-                    <div class="execs-section">
-                        <div class="execs-label">Executives</div>
-                        <div class="execs-list" id="execList">None assigned</div>
+                    <div class="roles-section">
+                        <div class="roles-label">Executives</div>
+                        <div class="roles-list" id="execList">None assigned</div>
                     </div>
 
-                    <div class="advisors-section">
-                        <div class="advisors-label">Advisors</div>
-                        <div class="advisors-list" id="advisorList">None assigned</div>
+                    <div class="roles-section">
+                        <div class="roles-label">Advisors</div>
+                        <div class="roles-list" id="advisorList">None assigned</div>
                     </div>
 
                     <div class="upload-section">
@@ -308,6 +309,7 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                 <?php
                 // Precompute executive membership map: email (lowercase) => [clubDir, ...]
                 $execMap = [];
+                $advisorMap = [];
                 foreach ($clubDirs as $d) {
                     $dir = (string) $d;
                     $drawer = club_load_drawer($dir);
@@ -315,6 +317,11 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                     $execs = array_map('strtolower', $drawer['executiveEmails'] ?? []);
                     foreach ($execs as $e) {
                         $execMap[$e][] = $dir;
+                    }
+
+                    $advisors = array_map('strtolower', $drawer['advisorEmails'] ?? []);
+                    foreach ($advisors as $e) {
+                        $advisorMap[$e][] = $dir;
                     }
                 }
                 ?>
@@ -326,8 +333,8 @@ $allUsers = $pdo->query("SELECT id, name, email, role, created_at FROM users ORD
                     $roleLabel = htmlspecialchars($role);
 
                     // If user has DB role 'executive', show the clubs they are assigned to (if any)
-                    if ($role === 'executive') {
-                        $clubsForUser = $execMap[$userEmailRow] ?? [];
+                    if ($role === 'executive' || $role === 'advisor') {
+                        $clubsForUser = ($role === 'executive' )? ($execMap[$userEmailRow] ?? []) : ($advisorMap[$userEmailRow] ?? []);
                         if (!empty($clubsForUser)) {
                             // Convert slugs to human-friendly names ("coding-club" -> "Coding Club")
                             $labels = array_map(function ($slug) {

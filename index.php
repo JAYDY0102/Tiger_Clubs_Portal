@@ -22,7 +22,7 @@ $user = $_SESSION['user'] ?? null;
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
-        <span>Tiger Clubs Portal</span>
+        <span><a href="index.php">Tiger Clubs Portal</a></span>
     </div>
 
     <nav class="nav">
@@ -36,7 +36,7 @@ $user = $_SESSION['user'] ?? null;
         <?php elseif ($isLoggedIn && $user['role'] === 'advisor'): ?>
             <a href="dashboard/advisor.php" class="inactive">Advisor Dashboard</a>
         <?php else: ?>
-            <a href="#">Dashboard</a>
+            <a href="#" class="inactive">Dashboard</a>
         <?php endif; ?>
     </nav>
 
@@ -133,7 +133,5 @@ $user = $_SESSION['user'] ?? null;
     </article>
 </template>
 
-<script src="script.js"></script>
-</body>
+<script src="script.js?v=<?= htmlspecialchars((string)time(), ENT_QUOTES, 'UTF-8') ?>"></script>
 </html>
-

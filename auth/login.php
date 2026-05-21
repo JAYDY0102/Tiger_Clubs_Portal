@@ -43,10 +43,13 @@ $staffUrl = buildGoogleAuthUrl(
 <header class="topbar">
     <div class="brand">
         <div class="brand-mark">S</div>
-        <span>Tiger Clubs Portal</span>
+        <span><a href="../index.php">Tiger Clubs Portal</a></span>
     </div>
     <nav class="nav">
-        <a href="../index.php">Home</a>
+        <a href="../index.php" class="inactive">Home</a>
+        <a href="#" class="inactive">Feed</a>
+        <a href="#" class="inactive">Calendar</a>
+        <a href="#" class="inactive">Dashboard</a>
     </nav>
 </header>
 
